@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis de Oraciones (Versión Mejorada)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;700&display=swap');
+        body {
+            font-family: 'Baloo 2', cursive;
+            background-color: #fdf6e3; /* Crema suave */
+            color: #586e75; /* Gris oscuro */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 25px 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            text-align: center;
+        }
+        h1 { color: #d33682; /* Magenta */ }
+        #progreso-container { font-size: 1.2em; font-weight: bold; color: #888; margin-bottom: 10px; }
+        #instruccion-actual { font-size: 1.6em; color: #cb4b16; /* Naranja */ margin: 15px 0; font-weight: bold; min-height: 50px; }
+        
+        #frase-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+            padding: 20px;
+            background-color: #eee8d5; /* Crema más oscuro */
+            border-radius: 12px;
+        }
+        .palabra {
+            padding: 10px 15px;
+            font-size: 1.5em;
+            border-radius: 8px;
+            border: 2px solid #93a1a1; /* Gris */
+            transition: all 0.2s ease-in-out;
+        }
+        .palabra.clickable { cursor: pointer; }
+        .palabra.clickable:hover { background-color: #fdf6e3; }
+        .palabra.seleccionada {
+            background-color: #2aa198; /* Turquesa */
+            border-color: #2aa198;
+            transform: scale(1.05);
+            color: white;
+        }
+        
+        #puntuacion-container { font-size: 1.5em; font-weight: bold; color: #859900; /* Verde lima */ margin-bottom: 20px; }
+        
+        .botones-container button {
+            padding: 12px 25px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            margin: 5px;
+            transition: transform 0.2s, background-color 0.3s;
+            font-family: 'Baloo 2', cursive;
+        }
+        .botones-container button:hover:not(:disabled) { transform: scale(1.05); }
+        .botones-container button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        #confirmar-btn { background-color: #268bd2; /* Azul */ }
+        #sujeto-eliptico-btn { background-color: #6c71c4; /* Violeta */ }
+        #siguiente-pregunta-btn { background-color: #dc322f; /* Rojo */ }
+        #enviar-btn { background-color: #b58900; /* Amarillo oscuro */ }
+
+        #feedback { margin-top: 20px; text-align: left; }
+        #feedback ul { list-style-type: none; padding-left: 0; text-align: center; }
+        #feedback li { font-size: 1.2em; margin-bottom: 5px; }
+
+        /* Estilos para la corrección */
+        #correccion-container { margin-top: 20px; padding: 15px; border: 2px dashed #93a1a1; border-radius: 10px; }
+        .solucion-sujeto { background-color: #cfe2ff; padding: 2px 5px; border-radius: 4px; }
+        .solucion-predicado { background-color: #fff3cd; padding: 2px 5px; border-radius: 4px; }
+        .solucion-nucleo { font-weight: 700; text-decoration: underline; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Análisis de Oraciones 🚀</h1>
+        <div id="juego">
+            <div id="progreso-container"></div>
+            <div id="puntuacion-container">Puntuación: <span id="puntuacion">0</span></div>
+            <h2 id="instruccion-actual">Cargando...</h2>
+            <div id="frase-container"></div>
+            <div class="botones-container">
+                <button id="confirmar-btn">Confirmar Selección</button>
+                <button id="sujeto-eliptico-btn">No hay Sujeto (Elíptico)</button>
+                <button id="siguiente-pregunta-btn" style="display: none;">Siguiente Pregunta</button>
+            </div>
+            <div id="feedback"></div>
+        </div>
+        <div id="resultado-final" style="display: none;">
+            <h2>¡Juego Terminado!</h2>
+            <p style="font-size: 1.4em;">Tu puntuación final es:</p>
+            <div id="puntuacion-final" style="font-size: 3em; font-weight: bold; color: #859900; margin: 20px 0;"></div>
+            <p>¡Eres un genio de la gramática! Puedes enviar tu resultado.</p>
+            <button id="enviar-btn">Enviar mi Puntuación</button>
+        </div>
+    </div>
+
+    <script>
+        // --- BANCO DE PREGUNTAS TOTALMENTE NUEVO ---
+        const PREGUNTAS_BASE = [
+            {
+                palabras: ["La", "amable", "bibliotecaria", "nos", "recomendó", "un", "libro", "de", "aventuras"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [0, 1, 2], nucleoSujeto: [2], nucleoPredicado: [4] }
+            },
+            {
+                palabras: ["Desde", "la", "ventana", "observaba", "el", "niño", "la", "lluvia"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [4, 5], nucleoSujeto: [5], nucleoPredicado: [3] }
+            },
+            {
+                palabras: ["Hoy", "comeremos", "lentejas", "con", "chorizo"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [], nucleoSujeto: ["nosotros"], nucleoPredicado: [1] }
+            },
+            {
+                palabras: ["El", "coche", "de", "mi", "vecino", "es", "de", "color", "rojo"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [0, 1, 2, 3, 4], nucleoSujeto: [1], nucleoPredicado: [5] }
+            },
+            {
+                palabras: ["Has", "visto", "mis", "zapatillas", "nuevas"],
+                puntuacion: ["¿", "?"],
+                respuestas: { sujeto: [], nucleoSujeto: ["tú"], nucleoPredicado: [0, 1] }
+            },
+            {
+                palabras: ["Ese", "castillo", "antiguo", "parece", "un", "gigante", "de", "piedra"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [0, 1, 2], nucleoSujeto: [1], nucleoPredicado: [3] }
+            },
+            {
+                palabras: ["Por", "la", "mañana", ",", "en", "el", "campo", ",", "cantan", "los", "pájaros"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [9, 10], nucleoSujeto: [10], nucleoPredicado: [8] }
+            },
+            {
+                palabras: ["El", "león", "y", "la", "leona", "cuidan", "de", "sus", "cachorros"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [0, 1, 2, 3, 4], nucleoSujeto: [1, 4], nucleoPredicado: [5] }
+            },
+            {
+                palabras: ["A", "mi", "prima", "le", "gustan", "mucho", "los", "animales"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [6, 7], nucleoSujeto: [7], nucleoPredicado: [4] }
+            },
+            {
+                palabras: ["Los", "excursionistas", "caminaron", "durante", "horas", "por", "la", "montaña"],
+                puntuacion: ["."],
+                respuestas: { sujeto: [0, 1], nucleoSujeto: [1], nucleoPredicado: [2] }
+            }
+        ];
+
+        // --- Variables y referencias al DOM (sin cambios) ---
+        const estados = ['sujeto', 'predicado', 'nucleoSujeto', 'nucleoPredicado'];
+        const titulosEstados = {
+            sujeto: 'el Sujeto',
+            predicado: 'el Predicado',
+            nucleoSujeto: 'el Núcleo del Sujeto',
+            nucleoPredicado: 'el Núcleo del Predicado'
+        };
+        let preguntasBarajadas = [];
+        let puntuacion = 0;
+        let preguntaActualIndex = 0;
+        let estadoIndex = 0;
+        let seleccionesUsuario = {};
+        const juegoDiv = document.getElementById('juego'), resultadoFinalDiv = document.getElementById('resultado-final'),
+        progresoContainer = document.getElementById('progreso-container'), puntuacionSpan = document.getElementById('puntuacion'),
+        instruccionActualH2 = document.getElementById('instruccion-actual'), fraseContainer = document.getElementById('frase-container'),
+        confirmarBtn = document.getElementById('confirmar-btn'), sujetoElipticoBtn = document.getElementById('sujeto-eliptico-btn'),
+        siguientePreguntaBtn = document.getElementById('siguiente-pregunta-btn'), enviarBtn = document.getElementById('enviar-btn'),
+        puntuacionFinalSpan = document.getElementById('puntuacion-final'), feedbackDiv = document.getElementById('feedback');
+
+        // --- Lógica del juego (con las mejoras) ---
+        function barajarArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function iniciarJuego() {
+            preguntasBarajadas = barajarArray([...PREGUNTAS_BASE]);
+            preguntaActualIndex = 0;
+            puntuacion = 0;
+            actualizarPuntuacion();
+            juegoDiv.style.display = 'block';
+            resultadoFinalDiv.style.display = 'none';
+            mostrarPregunta();
+        }
+
+        function mostrarPregunta() {
+            if (preguntaActualIndex >= preguntasBarajadas.length) {
+                finalizarJuego(); return;
+            }
+            estadoIndex = 0;
+            seleccionesUsuario = { sujeto: [], predicado: [], nucleoSujeto: [], nucleoPredicado: [] };
+            feedbackDiv.innerHTML = "";
+            progresoContainer.textContent = `Pregunta ${preguntaActualIndex + 1} de ${preguntasBarajadas.length}`;
+            const pregunta = preguntasBarajadas[preguntaActualIndex];
+            fraseContainer.innerHTML = '';
+            if (pregunta.puntuacion.length > 1) {
+                const signo = document.createElement('span');
+                signo.textContent = pregunta.puntuacion[0];
+                signo.classList.add('palabra');
+                fraseContainer.appendChild(signo);
+            }
+            pregunta.palabras.forEach((palabra, index) => {
+                const span = document.createElement('span');
+                span.textContent = palabra;
+                span.classList.add('palabra', 'clickable');
+                span.dataset.index = index;
+                span.addEventListener('click', () => toggleSeleccionPalabra(span));
+                fraseContainer.appendChild(span);
+            });
+            const signoFinal = document.createElement('span');
+            signoFinal.textContent = pregunta.puntuacion.length > 1 ? pregunta.puntuacion[1] : pregunta.puntuacion[0];
+            signoFinal.classList.add('palabra');
+            fraseContainer.appendChild(signoFinal);
+            habilitarBotones(true);
+            actualizarEstado();
+        }
+        
+        function actualizarEstado() {
+            const estadoActual = estados[estadoIndex];
+            instruccionActualH2.textContent = `Selecciona ${titulosEstados[estadoActual]}`;
+            sujetoElipticoBtn.style.display = (estadoActual === 'sujeto' || estadoActual === 'nucleoSujeto') ? 'inline-block' : 'none';
+            document.querySelectorAll('.palabra.seleccionada').forEach(p => p.classList.remove('seleccionada'));
+        }
+
+        function toggleSeleccionPalabra(span) {
+            if (span.classList.contains('clickable')) {
+                span.classList.toggle('seleccionada');
+            }
+        }
+
+        function confirmarSeleccion() {
+            const estadoActual = estados[estadoIndex];
+            seleccionesUsuario[estadoActual] = Array.from(document.querySelectorAll('.palabra.seleccionada')).map(p => parseInt(p.dataset.index));
+            estadoIndex++;
+            if (estadoIndex >= estados.length) {
+                evaluarRespuesta();
+            } else {
+                actualizarEstado();
+            }
+        }
+        
+        function manejarSujetoEliptico() {
+            const estadoActual = estados[estadoIndex];
+            if (estadoActual === 'sujeto') {
+                seleccionesUsuario.sujeto = [];
+                estadoIndex++; 
+                actualizarEstado();
+            } else if (estadoActual === 'nucleoSujeto') {
+                const pronombre = prompt("¿Cuál es el núcleo del sujeto omitido? (Ej: yo, tú, nosotros...)");
+                if (pronombre) {
+                    seleccionesUsuario.nucleoSujeto = [pronombre.trim().toLowerCase()];
+                    estadoIndex++; 
+                    actualizarEstado();
+                }
+            }
+        }
+
+        function evaluarRespuesta() {
+            habilitarBotones(false);
+            const pregunta = preguntasBarajadas[preguntaActualIndex];
+            let puntosOracion = 0;
+            const resultados = {};
+
+            for (const tipo of estados) {
+                let selCorrectaString;
+                const selUsuarioString = seleccionesUsuario[tipo].sort().toString();
+                if (tipo === 'predicado') {
+                    const todosLosIndices = pregunta.palabras.map((_, i) => i);
+                    const indicesSujetoCorrecto = new Set(pregunta.respuestas.sujeto);
+                    const indicesPredicadoCorrecto = todosLosIndices.filter(i => !indicesSujetoCorrecto.has(i));
+                    selCorrectaString = indicesPredicadoCorrecto.sort().toString();
+                } else {
+                    selCorrectaString = pregunta.respuestas[tipo].sort().toString();
+                }
+                resultados[tipo] = selUsuarioString === selCorrectaString;
+                if(resultados[tipo]) puntosOracion++;
+            }
+            
+            puntuacion += puntosOracion;
+            actualizarPuntuacion();
+            mostrarFeedbackCompleto(pregunta, resultados);
+        }
+
+        // *** FUNCIÓN DE FEEDBACK MEJORADA ***
+        function mostrarFeedbackCompleto(pregunta, resultados) {
+            let feedbackHTML = "<ul>";
+            for(const tipo of estados) {
+                feedbackHTML += `<li>${resultados[tipo] ? '✅' : '❌'} ${titulosEstados[tipo]}</li>`;
+            }
+            feedbackHTML += "</ul>";
+
+            // Contenedor para la respuesta correcta
+            const correccionDiv = document.createElement('div');
+            correccionDiv.id = 'correccion-container';
+            correccionDiv.innerHTML = '<h4>La respuesta correcta es:</h4>';
+
+            const fraseCorregidaDiv = document.createElement('div');
+            fraseCorregidaDiv.classList.add('frase-container');
+
+            pregunta.palabras.forEach((palabra, index) => {
+                const span = document.createElement('span');
+                span.textContent = palabra;
+                span.classList.add('palabra');
+                
+                // Aplicar estilos de Sujeto y Predicado
+                if (pregunta.respuestas.sujeto.includes(index)) {
+                    span.classList.add('solucion-sujeto');
+                } else {
+                    span.classList.add('solucion-predicado');
+                }
+                // Aplicar estilo de Núcleo (además del anterior)
+                if (pregunta.respuestas.nucleoSujeto.includes(index) || pregunta.respuestas.nucleoPredicado.includes(index)) {
+                     span.classList.add('solucion-nucleo');
+                }
+                fraseCorregidaDiv.appendChild(span);
+            });
+            
+            correccionDiv.appendChild(fraseCorregidaDiv);
+            feedbackDiv.innerHTML = feedbackHTML;
+            feedbackDiv.appendChild(correccionDiv);
+
+            // Bloquear la frase original para que no se pueda clicar
+             document.querySelectorAll('.palabra.clickable').forEach(span => span.classList.remove('clickable'));
+        }
+
+        function habilitarBotones(habilitar) {
+             confirmarBtn.disabled = !habilitar;
+             sujetoElipticoBtn.disabled = !habilitar;
+             siguientePreguntaBtn.style.display = habilitar ? 'none' : 'inline-block';
+        }
+
+        function siguientePregunta() {
+            preguntaActualIndex++;
+            mostrarPregunta();
+        }
+
+        function finalizarJuego() {
+            juegoDiv.style.display = 'none';
+            resultadoFinalDiv.style.display = 'block';
+            puntuacionFinalSpan.textContent = `${puntuacion} / ${preguntasBarajadas.length * 4}`;
+        }
+        
+        function actualizarPuntuacion() { puntuacionSpan.textContent = puntuacion; }
+        
+        function enviarPuntuacion() {
+            const nombreAlumno = prompt("¡Muy bien! Escribe tu nombre para enviar el correo:");
+            if (nombreAlumno && nombreAlumno.trim() !== '') {
+                const emailProfe = "rnuegon523@g.educaand.es";
+                const asunto = encodeURIComponent(`Puntuación de ${nombreAlumno} en Análisis de Oraciones`);
+                const cuerpo = encodeURIComponent(
+`Hola,
+
+Soy ${nombreAlumno}.
+
+He completado la actividad de análisis de oraciones y mi puntuación final es de ${puntuacion} sobre ${preguntasBarajadas.length * 4}.
+
+¡Un saludo!`
+                );
+                window.location.href = `mailto:${emailProfe}?subject=${asunto}&body=${cuerpo}`;
+            }
+        }
+
+        confirmarBtn.addEventListener('click', confirmarSeleccion);
+        sujetoElipticoBtn.addEventListener('click', manejarSujetoEliptico);
+        siguientePreguntaBtn.addEventListener('click', siguientePregunta);
+        enviarBtn.addEventListener('click', enviarPuntuacion);
+        window.addEventListener('load', iniciarJuego);
+    </script>
+</body>
+</html>
