@@ -1,0 +1,804 @@
+<!-- 
+    Esta aplicación utiliza la API de Gemini para:
+    1. Generar el cuento (LLM - Texto).
+    2. Generar preguntas de conversación (LLM - Reflexión).
+    3. Generar el audio del cuento (LLM - TTS).
+
+    CARACTERÍSTICA: Reproductor de Audio personalizado y compacto con controles avanzados (Pausa, Adelantar, Atrasar, Parar).
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Cuentos Mágicos</title>
+    
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Paleta de colores infantil y vibrante
+                        'primary-blue': '#42A5F5',      
+                        'secondary-orange': '#FF7043',  
+                        'tertiary-pink': '#EC407A',     
+                        'background-light': '#F3F4F6',  
+                        'card-bg': '#FFFFFF',           
+                        'text-dark': '#374151',         
+                        'success-green': '#66BB6A',     
+                        'audio-purple': '#AB47BC',      
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Estilos personalizados para un look suave y agradable */
+        body {
+            background-color: theme('colors.background-light'); 
+            color: theme('colors.text-dark');
+            font-family: theme('fontFamily.sans');
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 2rem;
+        }
+
+        .card {
+            background-color: theme('colors.card-bg');
+            border: 3px solid theme('colors.primary-blue'); 
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); 
+            transition: transform 0.3s ease-out;
+        }
+        
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .input-style {
+            border: 2px solid theme('colors.primary-blue');
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            transition: all 0.2s;
+        }
+
+        .input-style:focus {
+            border-color: theme('colors.secondary-orange');
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 112, 67, 0.5);
+        }
+
+        /* Estilos de botones de control (Más pequeños y compactos) */
+        .control-button {
+            @apply p-1 bg-audio-purple text-white rounded-full text-xl shadow-md hover:bg-secondary-orange transition-all duration-150 active:scale-95 disabled:bg-gray-400 font-semibold;
+            width: 45px; /* Tamaño reducido */
+            height: 45px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1; 
+            font-size: 1.1rem; /* Ajuste para el texto '10s' */
+        }
+
+        .control-button-lg {
+             /* El botón de Play/Pause puede ser un poco más grande */
+            width: 55px; 
+            height: 55px;
+            font-size: 1.5rem;
+        }
+        
+        /* Oculta los controles nativos */
+        #audioPlayer {
+            display: none !important; 
+        }
+
+        /* Barra de progreso personalizada */
+        #progressBar {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px;
+            background: theme('colors.background-light');
+            border-radius: 5px;
+            cursor: pointer;
+            border: 1px solid theme('colors.primary-blue');
+        }
+
+        #progressBar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px; /* Tamaño del thumb reducido */
+            height: 18px;
+            border-radius: 50%;
+            background: theme('colors.tertiary-pink');
+            cursor: pointer;
+            border: 3px solid theme('colors.card-bg');
+        }
+
+        #progressBar::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: theme('colors.tertiary-pink');
+            cursor: pointer;
+            border: 3px solid theme('colors.card-bg');
+        }
+        
+        /* Animación de carga (Loading Dots) - Mantenida */
+        .dot-pulse {
+          position: relative;
+          left: -9999px;
+          width: 10px;
+          height: 10px;
+          border-radius: 5px;
+          background-color: white; 
+          box-shadow: 9999px 0 0 -5px;
+          animation: dotPulse 1.5s infinite linear;
+          animation-delay: .25s;
+        }
+        .dot-pulse::before, .dot-pulse::after {
+          content: '';
+          display: inline-block;
+          position: absolute;
+          top: 0;
+          width: 10px;
+          height: 10px;
+          border-radius: 5px;
+          background-color: white; 
+        }
+
+        .dot-pulse::before {
+          box-shadow: 9984px 0 0 -5px;
+          animation: dotPulseBefore 1.5s infinite linear;
+          animation-delay: 0s;
+        }
+
+        .dot-pulse::after {
+          box-shadow: 10014px 0 0 -5px;
+          animation: dotPulseAfter 1.5s infinite linear;
+          animation-delay: .5s;
+        }
+
+        @keyframes dotPulseBefore {
+          0% { box-shadow: 9984px 0 0 -5px; }
+          30% { box-shadow: 9984px 0 0 2px; }
+          60%, 100% { box-shadow: 9984px 0 0 -5px; }
+        }
+
+        @keyframes dotPulse {
+          0% { box-shadow: 9999px 0 0 -5px; }
+          30% { box-shadow: 9999px 0 0 2px; }
+          60%, 100% { box-shadow: 9999px 0 0 -5px; }
+        }
+
+        @keyframes dotPulseAfter {
+          0% { box-shadow: 10014px 0 0 -5px; }
+          30% { box-shadow: 10014px 0 0 2px; }
+          60%, 100% { box-shadow: 10014px 0 0 -5px; }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <div class="w-full max-w-3xl space-y-8">
+        
+        <!-- Header -->
+        <header class="text-center">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-tertiary-pink mb-2 leading-tight">
+                Generador de Cuentos Mágicos ✨
+            </h1>
+            <p class="text-lg text-text-dark/80">Rellena el formulario y crea una historia única para tus niños.</p>
+        </header>
+
+        <!-- Formulario de Configuración del Cuento -->
+        <div class="card p-6 sm:p-8 rounded-2xl">
+            <h2 class="text-2xl font-bold mb-6 text-primary-blue border-b-2 border-secondary-orange pb-2">1. Detalles de la Historia</h2>
+            <form id="storyForm" class="space-y-6">
+
+                <!-- Edad -->
+                <div>
+                    <label for="age" class="block text-lg font-medium mb-1 text-text-dark">¿Para qué edad es el cuento?</label>
+                    <select id="age" name="age" required class="w-full input-style text-center">
+                        <option value="3">3 años (Vocabulario muy simple)</option>
+                        <option value="6" selected>6 años (Inicio de lectura)</option>
+                        <option value="9">9 años (Comprensión avanzada)</option>
+                        <option value="12">12 años (Temas complejos)</option>
+                    </select>
+                </div>
+
+                <!-- Nombre del Protagonista -->
+                <div>
+                    <div class="flex items-center space-x-3 mb-2">
+                        <input type="checkbox" id="hasProtagonistName" class="form-checkbox h-5 w-5 text-tertiary-pink border-primary-blue rounded" checked>
+                        <label for="hasProtagonistName" class="text-lg font-medium text-text-dark">Tengo el nombre del o los protagonistas</label>
+                    </div>
+                    <input type="text" id="protagonistNames" name="protagonistNames" placeholder="Ej: Leo el león, o Sara y su perro Max"
+                           class="w-full input-style" value="Un gatito valiente">
+                </div>
+
+                <!-- Tema (Desplegable) -->
+                <div>
+                    <label for="theme" class="block text-lg font-medium mb-1 text-text-dark">Elige el tema principal:</label>
+                    <select id="theme" name="theme" required class="w-full input-style">
+                        <option value="Navidad">Navidad 🎄</option>
+                        <option value="Halloween">Halloween 🎃</option>
+                        <option value="vacaciones">Vacaciones de Verano 🏖️</option>
+                        <option value="Semana Santa">Semana Santa 🕊️</option>
+                        <option value="amistad">Amistad y Compañerismo</option>
+                        <option value="aventura">Aventura y Exploración</option>
+                        <option value="Otro">Otro (Especificar abajo)</option>
+                    </select>
+                </div>
+
+                <!-- Campo "Otro Tema" (Oculto por defecto) -->
+                <div id="otherThemeContainer" class="hidden">
+                    <label for="otherTheme" class="block text-lg font-medium mb-1 text-secondary-orange">Escribe el tema que deseas:</label>
+                    <input type="text" id="otherTheme" name="otherTheme" placeholder="Ej: Un viaje a la Luna, un dragón vegetariano..."
+                           class="w-full input-style">
+                </div>
+
+                <!-- Extensión -->
+                <div>
+                    <label for="length" class="block text-lg font-medium mb-1 text-text-dark">¿Qué extensión quieres?</label>
+                    <select id="length" name="length" required class="w-full input-style">
+                        <option value="muy corto">Muy Corto (50-75 palabras)</option>
+                        <option value="corto">Corto (100-150 palabras)</option>
+                        <option value="medio" selected>Medio (200-300 palabras)</option>
+                        <option value="largo">Largo (400-500 palabras)</option>
+                        <option value="muy largo">Muy Largo (más de 600 palabras)</option>
+                    </select>
+                </div>
+
+                <!-- Moraleja/Valor -->
+                <div>
+                    <label for="moral" class="block text-lg font-medium mb-1 text-text-dark">¿Qué valor, moraleja o enseñanza debe tener?</label>
+                    <input type="text" id="moral" name="moral" placeholder="Ej: La importancia de compartir, ser honesto, el respeto"
+                           class="w-full input-style">
+                </div>
+
+                <!-- Botón de Generar CUENTO -->
+                <button type="submit" id="generateButton"
+                        class="w-full py-3 px-6 rounded-full text-xl uppercase tracking-wider shadow-lg bg-tertiary-pink text-white hover:bg-primary-blue disabled:bg-gray-400 transition-colors"
+                        disabled>
+                    <span id="buttonText">Generar Cuento Mágico ✨</span>
+                    <div id="loadingIndicator" class="hidden flex items-center justify-center space-x-2">
+                        <div class="dot-pulse"></div>
+                        <span class="ml-4">Creando la historia...</span>
+                    </div>
+                </button>
+            </form>
+        </div>
+        
+        <!-- Contenedor del Cuento Generado -->
+        <div class="card p-6 sm:p-8 rounded-2xl mt-8">
+            <h2 class="text-2xl font-bold mb-6 text-secondary-orange border-b-2 border-tertiary-pink pb-2">2. Resultado del Cuento</h2>
+            <div id="storyOutput" class="text-lg text-text-dark/90 leading-relaxed min-h-20">
+                <p class="text-center italic text-gray-400">Tu cuento único aparecerá aquí después de pulsar el botón de generar.</p>
+            </div>
+
+            <!-- Controles Adicionales LLM (Audio y Preguntas) -->
+            <div id="llmControls" class="mt-6 space-y-4">
+                <h3 class="text-xl font-bold text-primary-blue border-b border-gray-200 pb-1">Actividades Post-Lectura</h3>
+
+                <!-- Botón de Audio -->
+                <button id="generateAudioButton"
+                        class="w-full py-3 px-6 rounded-full text-xl uppercase tracking-wider shadow-lg bg-audio-purple text-white hover:bg-secondary-orange disabled:bg-gray-400 transition-colors"
+                        disabled>
+                    <span id="audioButtonText">Generar Audio (TTS) 🎧</span>
+                    <div id="audioLoadingIndicator" class="hidden flex items-center justify-center space-x-2">
+                        <div class="dot-pulse"></div>
+                        <span class="ml-4">Generando audio...</span>
+                    </div>
+                </button>
+
+                <!-- Reproductor de Audio (Personalizado) -->
+                <div id="audioPlayerContainer" class="hidden pt-4 bg-gray-100 p-4 rounded-xl border border-primary-blue/30">
+                    <audio id="audioPlayer" preload="auto"></audio> <!-- Audio element is hidden, only used for controls -->
+                    
+                    <!-- Barra de Progreso y Tiempo -->
+                    <div class="flex items-center space-x-3 mb-4">
+                        <span id="currentTimeDisplay" class="text-sm font-semibold text-text-dark/70 w-12 text-center">0:00</span>
+                        <input type="range" id="progressBar" min="0" max="100" value="0" class="flex-grow">
+                        <span id="durationDisplay" class="text-sm font-semibold text-text-dark/70 w-12 text-center">0:00</span>
+                    </div>
+
+                    <!-- Controles de Reproducción (Compacto y Horizontal) -->
+                    <div class="flex justify-center space-x-3">
+                        <button id="stopButton" class="control-button bg-red-500 hover:bg-red-600" title="Parar y Reiniciar">
+                            ⏹️
+                        </button>
+                        <button id="rewindButton" class="control-button" title="Retroceder 10 segundos">
+                            ⏪
+                        </button>
+                        <button id="playPauseButton" class="control-button control-button-lg bg-tertiary-pink hover:bg-tertiary-pink/80" title="Reproducir/Pausar">
+                            ▶️
+                        </button>
+                        <button id="forwardButton" class="control-button" title="Adelantar 10 segundos">
+                            ⏩
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Botón de Preguntas -->
+                <button id="generateQuestionsButton"
+                        class="w-full py-3 px-6 rounded-full text-xl uppercase tracking-wider shadow-lg bg-success-green text-white hover:bg-primary-blue disabled:bg-gray-400 transition-colors"
+                        disabled>
+                    <span id="questionsButtonText">Generar Preguntas de Conversación ✨</span>
+                    <div id="questionsLoadingIndicator" class="hidden flex items-center justify-center space-x-2">
+                        <div class="dot-pulse"></div>
+                        <span class="ml-4">Pensando en las preguntas...</span>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+        <!-- Contenedor de Preguntas Generadas -->
+        <div id="questionsContainer" class="card p-6 sm:p-8 rounded-2xl mt-4 hidden">
+            <h3 class="text-2xl font-bold mb-4 text-success-green border-b-2 border-primary-blue pb-2">3. Preguntas para Reflexión y Conversación</h3>
+            <div id="questionsOutput" class="text-lg text-text-dark/90 leading-relaxed">
+                <!-- Las preguntas se insertarán aquí -->
+            </div>
+        </div>
+
+        <!-- Mensaje de Error -->
+        <div id="errorMessage" class="hidden p-4 rounded-xl bg-red-100 text-red-700 font-semibold border border-red-400 shadow-md">
+            <p id="errorText">Ocurrió un error. Por favor, inténtalo de nuevo.</p>
+        </div>
+
+    </div>
+
+    <script>
+        window.onload = function() {
+            // Configuración de la API: la clave se inyecta automáticamente si es ""
+            const apiKey = "";
+            const LLM_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+            // Referencias a elementos del DOM
+            const form = document.getElementById('storyForm');
+            const themeSelect = document.getElementById('theme');
+            const otherThemeContainer = document.getElementById('otherThemeContainer');
+            const otherThemeInput = document.getElementById('otherTheme');
+            const protagonistCheckbox = document.getElementById('hasProtagonistName');
+            const protagonistInput = document.getElementById('protagonistNames');
+            const outputDiv = document.getElementById('storyOutput');
+            const generateButton = document.getElementById('generateButton');
+            const buttonText = document.getElementById('buttonText');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const errorMessage = document.getElementById('errorMessage');
+            const errorTextElement = document.getElementById('errorText');
+            const generateQuestionsButton = document.getElementById('generateQuestionsButton');
+            const questionsButtonText = document.getElementById('questionsButtonText');
+            const questionsLoadingIndicator = document.getElementById('questionsLoadingIndicator');
+            const questionsContainer = document.getElementById('questionsContainer');
+            const questionsOutput = document.getElementById('questionsOutput');
+
+            // NUEVAS referencias para el Audio TTS y el Reproductor Personalizado
+            const generateAudioButton = document.getElementById('generateAudioButton');
+            const audioButtonText = document.getElementById('audioButtonText');
+            const audioLoadingIndicator = document.getElementById('audioLoadingIndicator');
+            const audioPlayerContainer = document.getElementById('audioPlayerContainer');
+            const audioPlayer = document.getElementById('audioPlayer'); // El elemento <audio> oculto
+            
+            const playPauseButton = document.getElementById('playPauseButton');
+            const stopButton = document.getElementById('stopButton');
+            const rewindButton = document.getElementById('rewindButton');
+            const forwardButton = document.getElementById('forwardButton');
+            const progressBar = document.getElementById('progressBar');
+            const currentTimeDisplay = document.getElementById('currentTimeDisplay');
+            const durationDisplay = document.getElementById('durationDisplay');
+
+            // Habilitar el botón principal
+            generateButton.disabled = false;
+
+            // --- TTS HELPER FUNCTIONS (Conversión PCM a WAV) ---
+            
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            // Convierte Base64 a ArrayBuffer
+            function base64ToArrayBuffer(base64) {
+                const binaryString = atob(base64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes.buffer;
+            }
+
+            // Convierte PCM (Int16Array) a un Blob de WAV
+            function pcmToWav(pcm16, sampleRate) {
+                const numChannels = 1;
+                const bytesPerSample = 2; // Int16
+                const blockAlign = numChannels * bytesPerSample;
+                const byteRate = sampleRate * blockAlign;
+                const dataSize = pcm16.length * bytesPerSample;
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
+
+                /* RIFF identifier */
+                writeString(view, 0, 'RIFF');
+                /* file size */
+                view.setUint32(4, 36 + dataSize, true);
+                /* format */
+                writeString(view, 8, 'WAVE');
+                /* fmt chunk identifier */
+                writeString(view, 12, 'fmt ');
+                /* fmt chunk size */
+                view.setUint32(16, 16, true);
+                /* audio format (1 is PCM) */
+                view.setUint16(20, 1, true);
+                /* number of channels */
+                view.setUint16(22, numChannels, true);
+                /* sample rate */
+                view.setUint32(24, sampleRate, true);
+                /* byte rate */
+                view.setUint32(28, byteRate, true);
+                /* block align */
+                view.setUint16(32, blockAlign, true);
+                /* bits per sample */
+                view.setUint16(34, 16, true);
+                /* data chunk identifier */
+                writeString(view, 36, 'data');
+                /* data chunk size */
+                view.setUint32(40, dataSize, true);
+
+                // Escribir datos PCM
+                let offset = 44;
+                for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                    view.setInt16(offset, pcm16[i], true);
+                }
+
+                return new Blob([view], { type: 'audio/wav' });
+            }
+
+            // --- FUNCIÓN DE UTILIDAD ---
+
+            const fetchWithBackoff = async (url, options, maxRetries = 5) => {
+                for (let i = 0; i < maxRetries; i++) {
+                    try {
+                        const response = await fetch(url, options);
+                        
+                        if (response.status === 429) { 
+                            const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            continue;
+                        }
+                        
+                        if (!response.ok) {
+                            const errorBody = await response.text();
+                            if (response.status === 401 || response.status === 403) {
+                                throw new Error(`Error de Autorización (${response.status}).`);
+                            }
+                            throw new Error(`Error HTTP: ${response.status} - ${errorBody.substring(0, 100)}`);
+                        }
+                        return response.json();
+                    } catch (error) {
+                        if (i === maxRetries - 1) throw error;
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            };
+
+            const showTempError = (message) => {
+                errorTextElement.innerText = message;
+                errorMessage.classList.remove('hidden');
+                setTimeout(() => {
+                    errorMessage.classList.add('hidden');
+                }, 5000); 
+            };
+
+            // --- REPRODUCTOR PERSONALIZADO LÓGICA ---
+
+            // Formatea segundos a MM:SS
+            function formatTime(seconds) {
+                if (isNaN(seconds) || seconds < 0) return "0:00";
+                const mins = Math.floor(seconds / 60);
+                const secs = Math.floor(seconds % 60);
+                return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            }
+
+            // Actualiza la barra de progreso y el tiempo
+            audioPlayer.addEventListener('loadedmetadata', () => {
+                durationDisplay.textContent = formatTime(audioPlayer.duration);
+                progressBar.max = audioPlayer.duration;
+            });
+
+            audioPlayer.addEventListener('timeupdate', () => {
+                currentTimeDisplay.textContent = formatTime(audioPlayer.currentTime);
+                progressBar.value = audioPlayer.currentTime;
+                // Actualizar el progreso visual de la barra (color)
+                const percent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+                progressBar.style.background = `linear-gradient(to right, ${tailwind.config.theme.extend.colors['tertiary-pink']} ${percent}%, ${tailwind.config.theme.extend.colors['background-light']} ${percent}%)`;
+            });
+            
+            // Cuando la reproducción termina
+            audioPlayer.addEventListener('ended', () => {
+                playPauseButton.innerHTML = '▶️';
+                audioPlayer.currentTime = 0;
+            });
+
+            // Botón Play/Pause
+            playPauseButton.addEventListener('click', () => {
+                if (audioPlayer.paused) {
+                    audioPlayer.play();
+                    playPauseButton.innerHTML = '⏸️';
+                } else {
+                    audioPlayer.pause();
+                    playPauseButton.innerHTML = '▶️';
+                }
+            });
+
+            // Botón Stop
+            stopButton.addEventListener('click', () => {
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                playPauseButton.innerHTML = '▶️';
+            });
+
+            // Botón Rewind (Retroceder 10s)
+            rewindButton.addEventListener('click', () => {
+                audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 10);
+            });
+
+            // Botón Forward (Adelantar 10s)
+            forwardButton.addEventListener('click', () => {
+                audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 10);
+            });
+
+            // Arrastrar la barra de progreso
+            progressBar.addEventListener('input', () => {
+                audioPlayer.currentTime = progressBar.value;
+            });
+
+            // --- FUNCIÓN DE GENERACIÓN DE AUDIO (TTS) ---
+            const generateTtsAudio = async () => {
+                const storyText = outputDiv.innerText;
+
+                if (!storyText || storyText.includes('Tu cuento único aparecerá aquí')) {
+                    showTempError('Primero debes generar un cuento.');
+                    return;
+                }
+
+                // Pausar y restablecer el reproductor antes de cargar uno nuevo
+                audioPlayer.pause();
+                audioPlayer.currentTime = 0;
+                playPauseButton.innerHTML = '▶️';
+                audioPlayerContainer.classList.add('hidden');
+                audioPlayer.src = ''; 
+                
+                // Limitar texto para TTS (por buenas prácticas) y quitar el título
+                // Nota: Usamos una expresión simple para quitar el Título (H3) del texto plano.
+                const titleMatch = storyText.match(/^(.+?)\n\n/); // Intenta encontrar el primer H3/título
+                const cleanedText = titleMatch ? storyText.substring(titleMatch[0].length).trim() : storyText;
+                const textToSpeak = cleanedText.substring(0, 1000); 
+
+                // 1. Construir el payload para TTS
+                const payload = {
+                    contents: [{
+                        parts: [{ text: textToSpeak }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            // Usar una voz adecuada para la narración en español (ej. Leda, Orus o Puck - Upbeat)
+                            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Puck" } }
+                        }
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+
+                // 2. Mostrar carga
+                generateAudioButton.disabled = true;
+                audioButtonText.classList.add('hidden');
+                audioLoadingIndicator.classList.remove('hidden');
+
+                try {
+                    const result = await fetchWithBackoff(TTS_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // 3. Procesar y mostrar resultado
+                    const part = result?.candidates?.[0]?.content?.parts?.[0];
+                    const audioData = part?.inlineData?.data;
+                    const mimeType = part?.inlineData?.mimeType;
+
+                    if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                        const rateMatch = mimeType.match(/rate=(\d+)/);
+                        const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                        
+                        const pcmData = base64ToArrayBuffer(audioData);
+                        const pcm16 = new Int16Array(pcmData);
+                        const wavBlob = pcmToWav(pcm16, sampleRate);
+                        
+                        // Cargar el audio en el elemento <audio> y mostrar el reproductor personalizado
+                        const audioUrl = URL.createObjectURL(wavBlob);
+                        audioPlayer.src = audioUrl;
+                        audioPlayerContainer.classList.remove('hidden');
+                        
+                        // Opcional: Reproducir automáticamente el audio al cargarse
+                        audioPlayer.play();
+                        playPauseButton.innerHTML = '⏸️'; 
+                        
+                    } else {
+                        showTempError('No se pudo generar el audio. El modelo no devolvió datos de audio válidos.');
+                    }
+                } catch (error) {
+                    console.error("Error al llamar a la API de Gemini para TTS:", error);
+                    showTempError('Fallo en la generación de audio. Verifica la conexión.');
+                } finally {
+                    // 4. Ocultar carga y habilitar botón
+                    generateAudioButton.disabled = false;
+                    audioButtonText.classList.remove('hidden');
+                    audioLoadingIndicator.classList.add('hidden');
+                }
+            };
+
+            // --- FUNCIÓN DE GENERACIÓN DE PREGUNTAS (LLM) ---
+            const generateDiscussionQuestions = async () => {
+                // (Mismo código que antes para el segundo feature)
+                const storyText = outputDiv.innerText;
+                const age = document.getElementById('age').value;
+                const moral = document.getElementById('moral').value.trim();
+
+                if (!storyText || storyText.includes('Tu cuento único aparecerá aquí')) {
+                    showTempError('Primero debes generar un cuento.');
+                    return;
+                }
+
+                questionsContainer.classList.add('hidden');
+                questionsOutput.innerHTML = '';
+                
+                const moralText = moral ? ` Asegúrate de que las preguntas enfaticen el valor o moraleja de "${moral}".` : '';
+                const userQuery = `Basado en el siguiente cuento, genera 5 preguntas de comprensión y reflexión adecuadas para un niño de ${age} años.${moralText}
+
+Cuento:
+"""
+${storyText}
+"""
+`;
+                
+                const systemPrompt = `Eres un educador entusiasta y amable. Genera únicamente una lista numerada de 5 preguntas concisas de comprensión y reflexión sobre la historia proporcionada. Evita cualquier texto introductorio o de despedida.`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: userQuery }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] },
+                    config: { temperature: 0.5 } 
+                };
+
+                generateQuestionsButton.disabled = true;
+                questionsButtonText.classList.add('hidden');
+                questionsLoadingIndicator.classList.remove('hidden');
+
+                try {
+                    const result = await fetchWithBackoff(LLM_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        questionsOutput.innerHTML = text.replace(/\n/g, '<br>');
+                        questionsContainer.classList.remove('hidden');
+                    } else {
+                        showTempError('No se pudo generar las preguntas. Inténtalo de nuevo.');
+                    }
+                } catch (error) {
+                    console.error("Error al llamar a la API de Gemini para Preguntas:", error);
+                    showTempError('Fallo en la generación de preguntas. Verifica la conexión.');
+                } finally {
+                    generateQuestionsButton.disabled = false;
+                    questionsButtonText.classList.remove('hidden');
+                    questionsLoadingIndicator.classList.add('hidden');
+                }
+            };
+
+            // --- LÓGICA PRINCIPAL DE GENERACIÓN DEL CUENTO ---
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                errorMessage.classList.add('hidden');
+                outputDiv.innerHTML = ''; 
+                // Deshabilitar botones post-generación y limpiar estado
+                generateQuestionsButton.disabled = true; 
+                generateAudioButton.disabled = true;
+                questionsContainer.classList.add('hidden');
+                audioPlayerContainer.classList.add('hidden');
+                audioPlayer.pause();
+                audioPlayer.src = '';
+                playPauseButton.innerHTML = '▶️';
+                currentTimeDisplay.textContent = '0:00';
+                durationDisplay.textContent = '0:00';
+                progressBar.value = 0;
+                progressBar.style.background = `linear-gradient(to right, ${tailwind.config.theme.extend.colors['tertiary-pink']} 0%, ${tailwind.config.theme.extend.colors['background-light']} 0%)`;
+
+                // 1. Recoger datos del formulario
+                const age = document.getElementById('age').value;
+                let protagonist = protagonistCheckbox.checked && protagonistInput.value.trim() ? protagonistInput.value.trim() : 'Protagonista(s) inventado(s)';
+                const length = document.getElementById('length').value;
+                const moral = document.getElementById('moral').value.trim(); 
+                let theme = themeSelect.value;
+                if (theme === 'Otro') { theme = otherThemeInput.value.trim() || 'un tema de fantasía y diversión'; }
+                
+                const moralClause = moral ? `- Moraleja/Enseñanza: ${moral}.` : '';
+
+                // 2. Construir el prompt para Gemini (Cuento)
+                const userQuery = `Crea un cuento original. - Edad del lector: ${age} años. - Protagonista(s): ${protagonist}. - Tema principal: ${theme}. - Extensión del cuento: ${length}. ${moralClause} El cuento debe ser fácil de entender para la edad indicada y capturar la imaginación infantil.`;
+                const systemPrompt = `Actúa como un narrador de cuentos infantiles profesional, amable y entusiasta. El cuento debe ser original, divertido, tener un lenguaje simple y directo. El texto final debe estar listo para ser leído a un niño, incluyendo un título llamativo. Formatea el cuento solo con el título (usando ##) y párrafos cortos. No incluyas comentarios, introducciones o despedidas.`;
+                
+                const payload = { 
+                    contents: [{ parts: [{ text: userQuery }] }], 
+                    systemInstruction: { parts: [{ text: systemPrompt }] }, 
+                    config: { temperature: 0.8 } 
+                };
+
+                // 3. Mostrar indicador de carga y deshabilitar botón principal
+                generateButton.disabled = true;
+                buttonText.classList.add('hidden');
+                loadingIndicator.classList.remove('hidden');
+
+                try {
+                    const result = await fetchWithBackoff(LLM_API_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    // 4. Procesar y mostrar el resultado
+                    const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                    if (text) {
+                        // Formatear el texto
+                        let formattedText = text.replace(/##\s*(.*)/g, '<h3 class="text-3xl sm:text-4xl font-extrabold text-secondary-orange mb-4 mt-2 text-center">$1</h3>');
+                        formattedText = formattedText.split('\n\n').map(p => {
+                            if (p.trim() !== '' && !p.startsWith('<h3')) { return `<p class="mb-4">${p.trim()}</p>`; }
+                            return p;
+                        }).join('');
+
+                        outputDiv.innerHTML = formattedText;
+                        // Habilitar botones post-generación
+                        generateQuestionsButton.disabled = false; 
+                        generateAudioButton.disabled = false;
+                    } else {
+                        showTempError('No se pudo generar el cuento. Inténtalo con una descripción diferente.');
+                        outputDiv.innerHTML = '<p class="text-center italic text-gray-400">Inténtalo de nuevo...</p>';
+                    }
+
+                } catch (error) {
+                    console.error("Error al llamar a la API de Gemini para el Cuento:", error);
+                    if (error.message.includes('Autorización')) {
+                        showTempError('¡Fallo de Autorización! (Verifica la API Key en el entorno de Google Sites).');
+                    } else {
+                        showTempError('¡Fallo de Conexión! Por favor, revisa tu conexión e inténtalo de nuevo.');
+                    }
+                    outputDiv.innerHTML = '<p class="text-center italic text-gray-400">Inténtalo de nuevo...</p>';
+                } finally {
+                    // 5. Ocultar carga y habilitar botón
+                    generateButton.disabled = false;
+                    buttonText.classList.remove('hidden');
+                    loadingIndicator.classList.add('hidden');
+                }
+            });
+
+            // Listeners para los features
+            generateQuestionsButton.addEventListener('click', generateDiscussionQuestions);
+            generateAudioButton.addEventListener('click', generateTtsAudio);
+        }; 
+    </script>
+</body>
+</html>
