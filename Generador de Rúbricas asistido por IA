@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Rúbricas con IA Avanzada</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .card { background-color: white; border-radius: 0.75rem; border: 1px solid #e5e7eb; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        .btn { display: inline-flex; align-items: center; justify-content: center; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; transition: all 0.2s ease-in-out; cursor: pointer; }
+        .btn-primary { background-color: #4f46e5; color: white; }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-primary:disabled { background-color: #a5b4fc; cursor: not-allowed; }
+        .btn-secondary { background-color: #10b981; color: white; }
+        .btn-secondary:hover { background-color: #059669; }
+        .btn-danger { background-color: #ef4444; color: white; padding: 0.5rem 1rem; font-size: 0.875rem; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-undo { background-color: #f59e0b; color: white; padding: 0.25rem 0.75rem; font-size: 0.75rem; margin-left: 0.5rem; }
+        .btn-undo:hover { background-color: #d97706; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #4f46e5; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .level-input-grid { display: grid; gap: 1rem; margin-top: 0.5rem; margin-bottom: 1rem; align-items: center; }
+        .level-input-grid label { font-size: 0.875rem; font-weight: 500; text-align: center; color: #4b5563; }
+        .level-input-grid input { text-align: center; }
+        .textarea-wrapper { position: relative; }
+        .refine-btn { position: absolute; bottom: 8px; right: 8px; background-color: rgba(255, 255, 255, 0.7); backdrop-filter: blur(4px); border: 1px solid #e5e7eb; border-radius: 9999px; padding: 4px; cursor: pointer; transition: all 0.2s; }
+        .refine-btn:hover { background-color: #e5e7eb; }
+        .refine-btn .loader { width: 16px; height: 16px; border-width: 2px; }
+        #file-upload-label { cursor: pointer; border: 2px dashed #cbd5e1; padding: 2rem; text-align: center; border-radius: 0.5rem; }
+        #file-upload-label:hover { border-color: #4f46e5; background-color: #f0f2ff; }
+        .view { display: none; }
+        .view.active { display: block; }
+        .option-card { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .option-card:hover { transform: translateY(-5px); box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+        .hidden-section { display: none; }
+        /* Estilos del Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 50; visibility: hidden; opacity: 0; transition: opacity 0.3s, visibility 0.3s; }
+        .modal-overlay.visible { visibility: visible; opacity: 1; }
+        .modal-content { background: white; padding: 2rem; border-radius: 0.75rem; width: 90%; max-width: 48rem; max-height: 80vh; overflow-y: auto; position: relative; transform: scale(0.95); transition: transform 0.3s; }
+        .modal-overlay.visible .modal-content { transform: scale(1); }
+        .modal-close-btn { position: absolute; top: 1rem; right: 1rem; background: #e5e7eb; border-radius: 50%; padding: 0.5rem; cursor: pointer; }
+        .modal-close-btn:hover { background: #d1d5db; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app-container" class="container mx-auto p-4 md:p-8 max-w-6xl">
+        
+        <!-- Vista Principal: Selección de Opción -->
+        <div id="view-home" class="view active">
+            <header class="text-center mb-8">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Generador de Rúbricas Asistido por IA</h1>
+                <p class="mt-2 text-lg text-gray-600">Elige cómo quieres empezar a crear tu rúbrica para Google Classroom.</p>
+            </header>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div data-nav-to="import" class="option-card card text-center">
+                    <svg class="mx-auto h-16 w-16 text-indigo-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-4-4V6a4 4 0 014-4h10a4 4 0 014 4v6a4 4 0 01-4 4H7z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V6m10 10V6"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16v4a2 2 0 01-2 2H9a2 2 0 01-2-2v-4"></path></svg>
+                    <h2 class="text-xl font-bold mb-2">Opción 1: Importar Archivo</h2>
+                    <p class="text-gray-600">Sube un PDF o una imagen de una rúbrica existente y la IA la replicará por ti.</p>
+                </div>
+                <div data-nav-to="full-ai" class="option-card card text-center">
+                    <svg class="mx-auto h-16 w-16 text-indigo-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                    <h2 class="text-xl font-bold mb-2">Opción 2: Creación Rápida con IA</h2>
+                    <p class="text-gray-600">Define un tema, asignatura y nivel, y la IA generará una rúbrica completa o te sugerirá criterios.</p>
+                </div>
+                <div data-nav-to="editor" class="option-card card text-center">
+                     <svg class="mx-auto h-16 w-16 text-indigo-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                    <h2 class="text-xl font-bold mb-2">Opción 3: Editor Manual Detallado</h2>
+                    <p class="text-gray-600">Construye tu rúbrica paso a paso, con total control y asistencia de la IA en cada campo.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vista del Editor (Contenedor General) -->
+        <div id="view-editor-container" class="view">
+            <button class="btn bg-gray-200 text-gray-700 hover:bg-gray-300 mb-4 back-to-home">← Volver al Inicio</button>
+            <div id="editor-content"></div>
+            <div id="criteria-section" class="hidden-section">
+                <div class="card">
+                    <h2 class="text-xl font-semibold mb-2">Criterios de Evaluación</h2>
+                    <div id="loading-spinner" class="hidden flex items-center justify-center my-4">
+                        <div class="loader"></div><p class="ml-4 text-gray-600">La IA está trabajando...</p>
+                    </div>
+                    <div id="criteria-container"></div>
+                    <button id="add-criterion-btn" class="mt-4 btn bg-gray-200 text-gray-700 hover:bg-gray-300">+ Añadir Criterio</button>
+                </div>
+
+                <!-- NUEVA SECCIÓN DE ACCIONES CON IA -->
+                <div id="advanced-ai-actions" class="card">
+                    <h2 class="text-xl font-semibold mb-4 border-b pb-2">Acciones de IA Avanzadas</h2>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <button id="analyze-rubric-btn" class="btn btn-primary">✨ Analizar Coherencia de la Rúbrica</button>
+                        <button id="student-version-btn" class="btn btn-primary">✨ Crear Versión para Alumnos</button>
+                    </div>
+                </div>
+
+                <div class="card text-center">
+                     <h2 class="text-xl font-semibold mb-4 border-b pb-2">Descargar Rúbrica</h2>
+                     <button id="download-csv-btn" class="btn btn-secondary text-lg">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                         Descargar Rúbrica (.csv)
+                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modal para resultados de la IA -->
+    <div id="ai-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button id="modal-close" class="modal-close-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <h2 id="modal-title" class="text-2xl font-bold mb-4"></h2>
+            <div id="modal-body" class="prose max-w-none"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // ELEMENTOS DEL DOM
+            const appContainer = document.getElementById('app-container');
+            const views = document.querySelectorAll('.view');
+            const editorContent = document.getElementById('editor-content');
+            const criteriaSection = document.getElementById('criteria-section');
+            const criteriaContainer = document.getElementById('criteria-container');
+            const loadingSpinner = document.getElementById('loading-spinner');
+            const aiModal = document.getElementById('ai-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalBody = document.getElementById('modal-body');
+            
+            // ESTADO DE LA APLICACIÓN
+            let criterionCounter = 0;
+            let undoStates = {};
+            let currentLevelCount = 4;
+
+            // --- FUNCIONES DEL MODAL ---
+            const showModal = (title, content) => {
+                modalTitle.textContent = title;
+                modalBody.innerHTML = content;
+                aiModal.classList.add('visible');
+            };
+            const hideModal = () => {
+                aiModal.classList.remove('visible');
+            };
+
+            // --- FUNCIONES AUXILIARES ---
+
+            /**
+             * Escapa un campo de texto para que sea seguro en un archivo CSV.
+             * @param {any} field - El valor del campo a escapar.
+             * @returns {string} El campo escapado.
+             */
+            const escapeCsvField = (field) => {
+                const stringField = String(field ?? '');
+                if (stringField.includes('"') || stringField.includes(',') || stringField.includes('\n')) {
+                    return `"${stringField.replace(/"/g, '""')}"`;
+                }
+                return stringField;
+            };
+
+            /**
+             * Convierte un archivo a una cadena Base64.
+             * @param {File} file - El archivo a convertir.
+             * @returns {Promise<string>} Una promesa que se resuelve con la cadena base64.
+             */
+            const fileToBase64 = (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = error => reject(error);
+            });
+            
+            /**
+             * Muestra u oculta un elemento de carga y deshabilita/habilita un botón.
+             * @param {HTMLElement} element - El elemento a modificar (botón o spinner).
+             * @param {boolean} isLoading - True para mostrar carga, false para ocultarla.
+             * @param {string} [content=''] - Contenido HTML para el botón cuando no está cargando.
+             */
+            const setLoading = (element, isLoading, content = '') => {
+                if (!element) return;
+                if (element.id === 'loading-spinner') {
+                    element.classList.toggle('hidden', !isLoading);
+                    element.classList.toggle('flex', isLoading);
+                } else {
+                    element.disabled = isLoading;
+                    if (isLoading) {
+                        element.innerHTML = content || `<div class="loader"></div>`;
+                    } else {
+                        element.innerHTML = content;
+                    }
+                }
+            };
+            
+            /**
+             * Maneja los errores de la API y muestra una alerta.
+             * @param {Error} error - El objeto de error.
+             * @param {string} action - La acción que falló (ej. "generar descripciones").
+             */
+            const handleError = (error, action) => {
+                 console.error(`Error al ${action}:`, error);
+                 alert(`Hubo un error al intentar ${action}. Por favor, revisa la consola para más detalles.`);
+            };
+
+            // DATOS POR DEFECTO
+            const defaultTitles = {
+                3: ['Competente', 'En desarrollo', 'Necesita mejorar'],
+                4: ['Ejemplar', 'Competente', 'En desarrollo', 'Necesita mejorar'],
+                5: ['Experto', 'Ejemplar', 'Competente', 'En desarrollo', 'Necesita mejorar']
+            };
+
+            const defaultPoints = {
+                3: ['3', '2', '1'],
+                4: ['4', '3', '2', '1'],
+                5: ['5', '4', '3', '2', '1']
+            };
+
+            // --- NAVEGACIÓN Y VISTAS ---
+
+            /**
+             * Muestra una vista específica y oculta las demás.
+             * @param {string} viewId - El ID de la vista a mostrar.
+             */
+            const showView = (viewId) => {
+                views.forEach(view => view.classList.remove('active'));
+                document.getElementById(viewId).classList.add('active');
+            };
+
+            /** Configura la interfaz para la importación de archivos. */
+            function setupImportView() {
+                editorContent.innerHTML = `
+                    <div class="card">
+                        <h2 class="text-xl font-semibold mb-2">Opción 1: Importar Rúbrica desde Archivo</h2>
+                        <input type="file" id="rubric-file-input" class="hidden" accept="application/pdf,image/jpeg,image/png">
+                        <label for="rubric-file-input" id="file-upload-label">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true"><path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                            <span class="mt-2 block text-sm font-medium text-gray-900">Selecciona un archivo</span>
+                            <span id="file-name" class="mt-1 block text-xs text-gray-500">PDF, PNG, JPG</span>
+                        </label>
+                        <button id="process-file-btn" class="btn btn-primary w-full mt-4" disabled>✨ Analizar y Replicar Rúbrica</button>
+                    </div>`;
+                document.getElementById('add-criterion-btn').style.display = 'none';
+                criteriaSection.classList.remove('hidden-section');
+            }
+
+            /** Configura la interfaz para la generación completa con IA. */
+            function setupFullAIView() {
+                editorContent.innerHTML = `
+                    <div class="card">
+                        <h2 class="text-xl font-semibold mb-2">Opción 2: Creación Rápida con IA</h2>
+                        <div class="space-y-4">
+                            <div><label for="skill" class="block text-sm font-medium">Título General</label><input type="text" id="skill" class="w-full p-2 border rounded-md mt-1" placeholder="Ej: Ensayo sobre la Guerra Fría"></div>
+                            <div><label for="subject" class="block text-sm font-medium">Asignatura</label><input type="text" id="subject" class="w-full p-2 border rounded-md mt-1" placeholder="Ej: Historia"></div>
+                            <div><label for="level" class="block text-sm font-medium">Nivel</label><input type="text" id="level" class="w-full p-2 border rounded-md mt-1" placeholder="Ej: 4º de ESO"></div>
+                        </div>
+                        <div id="ai-suggestion-area" class="mt-4"></div>
+                        <div class="grid sm:grid-cols-2 gap-4 mt-4">
+                            <button id="ai-suggest-titles-btn" class="btn btn-primary">✨ Sugerir Criterios</button>
+                            <button id="ai-full-rubric-btn" class="btn btn-primary">✨ Generar Rúbrica Completa</button>
+                        </div>
+                    </div>`;
+                currentLevelCount = 4;
+                document.getElementById('add-criterion-btn').style.display = 'none';
+                criteriaSection.classList.remove('hidden-section');
+            }
+
+            /** Configura la interfaz para el editor manual. */
+            function setupEditorView() {
+                editorContent.innerHTML = `
+                    <div class="card">
+                        <h2 class="text-xl font-semibold mb-2">Opción 3: Editor Manual Detallado</h2>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="skill" class="block text-sm font-medium">Título General</label>
+                                <input type="text" id="skill" class="w-full p-2 border rounded-md mt-1" placeholder="Escribe el título aquí...">
+                            </div>
+                            <div>
+                                <label for="level-count-selector" class="block text-sm font-medium">Número de Niveles</label>
+                                <select id="level-count-selector" class="w-full p-2 border rounded-md mt-1">
+                                    <option value="3">3 Niveles</option>
+                                    <option value="4" selected>4 Niveles</option>
+                                    <option value="5">5 Niveles</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button id="start-editing-btn" class="btn btn-primary w-full mt-4">Empezar a Crear Criterios</button>
+                    </div>`;
+                document.getElementById('add-criterion-btn').style.display = 'inline-flex';
+            }
+            
+            // --- MANEJO DE CRITERIOS ---
+
+            /**
+             * Crea y añade un nuevo elemento de criterio al DOM.
+             * @param {object} [data={}] - Datos preexistentes para el criterio.
+             */
+            const createCriterionElement = (data = {}) => {
+                criterionCounter++;
+                const criterionId = `criterion-${criterionCounter}`;
+                const element = document.createElement('div');
+                element.classList.add('criterion-item', 'border', 'p-4', 'rounded-lg', 'mb-4', 'bg-white');
+                element.id = criterionId;
+
+                const levels = data.levelTitles ? data.levelTitles.length : currentLevelCount;
+                
+                const defaultData = {
+                    title: data.title || '',
+                    points: data.points || defaultPoints[levels] || Array(levels).fill(1),
+                    levelTitles: data.levelTitles || defaultTitles[levels] || Array(levels).fill('Nivel'),
+                    levelDescs: data.levelDescs || Array(levels).fill(''),
+                };
+
+                const gridColsClass = `grid-cols-${levels > 3 ? 2 : levels}`;
+                const mdGridColsClass = `md:grid-cols-${levels}`;
+
+                element.innerHTML = `
+                    <div class="flex justify-between items-center mb-3">
+                        <label class="text-lg font-semibold">Criterio ${criterionCounter}</label>
+                        <button class="btn btn-danger remove-criterion-btn" data-criterion-id="${criterionId}">Eliminar</button>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label for="${criterionId}-title" class="text-sm font-medium">Título del Criterio</label>
+                            <input type="text" id="${criterionId}-title" class="w-full p-2 border rounded-md mt-1" value="${escapeCsvField(defaultData.title)}">
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button class="btn btn-primary btn-sm generate-descriptions-btn" data-criterion-id="${criterionId}">✨ Generar Descripciones</button>
+                            <div id="undo-container-${criterionId}-all"></div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">Puntos y Títulos de Nivel</label>
+                            <div class="level-input-grid" style="grid-template-columns: repeat(${levels}, 1fr);">
+                                ${defaultData.points.map(() => `<label>Puntos</label>`).join('')}
+                                ${defaultData.points.map((p, i) => `<input type="number" class="w-full p-2 border rounded-md" value="${p}" data-type="point" data-index="${i}">`).join('')}
+                                ${defaultData.levelTitles.map((t, i) => `<label>Título Nivel ${levels - i}</label>`).join('')}
+                                ${defaultData.levelTitles.map((t, i) => `<input type="text" class="w-full p-2 border rounded-md" value="${escapeCsvField(t)}" data-type="level-title" data-index="${i}">`).join('')}
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium">Descripciones de Nivel</label>
+                            <div class="grid ${gridColsClass} ${mdGridColsClass} gap-4 mt-1">
+                                ${defaultData.levelDescs.map((d, i) => `
+                                <div class="textarea-wrapper">
+                                    <textarea class="w-full p-2 border rounded-md mt-1 h-32" data-type="level-desc" data-index="${i}" placeholder="Descripción para '${escapeCsvField(defaultData.levelTitles[i])}'">${escapeCsvField(d)}</textarea>
+                                    <div class="absolute bottom-2 right-2 flex items-center space-x-2">
+                                        <div id="undo-container-${criterionId}-${i}"></div>
+                                        <button class="refine-btn" data-criterion-id="${criterionId}" data-level-index="${i}" title="Refinar este texto con IA">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-1.1 0-2 .9-2 2v2.5a2.5 2.5 0 1 0 5 0V5c0-1.1-.9-2-2-2Z"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><path d="M12 19v2"/><path d="M8 23h8"/></svg>
+                                        </button>
+                                    </div>
+                                </div>`).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                criteriaContainer.appendChild(element);
+            };
+            
+            // --- MANEJADORES DE EVENTOS ---
+
+            /** Event listener principal para toda la aplicación */
+            appContainer.addEventListener('click', async (e) => {
+                const navCard = e.target.closest('.option-card');
+                if (navCard) {
+                    const navTo = navCard.dataset.navTo;
+                    if (navTo === 'import') setupImportView();
+                    if (navTo === 'full-ai') setupFullAIView();
+                    if (navTo === 'editor') setupEditorView();
+                    showView('view-editor-container');
+                    return;
+                }
+                
+                if (e.target.closest('.back-to-home')) {
+                    criteriaContainer.innerHTML = '';
+                    criterionCounter = 0;
+                    editorContent.innerHTML = '';
+                    criteriaSection.classList.add('hidden-section');
+                    showView('view-home');
+                    return;
+                }
+
+                if (e.target.closest('#modal-close') || e.target.id === 'ai-modal') {
+                    hideModal();
+                    return;
+                }
+
+                const addBtn = e.target.closest('#add-criterion-btn');
+                if(addBtn) createCriterionElement();
+
+                const startEditingBtn = e.target.closest('#start-editing-btn');
+                if(startEditingBtn) {
+                    currentLevelCount = parseInt(document.getElementById('level-count-selector').value, 10);
+                    criteriaSection.classList.remove('hidden-section');
+                    startEditingBtn.parentElement.classList.add('hidden-section');
+                    createCriterionElement();
+                }
+
+                const removeBtn = e.target.closest('.remove-criterion-btn');
+                if (removeBtn) document.getElementById(removeBtn.dataset.criterionId)?.remove();
+                
+                const undoBtn = e.target.closest('.undo-action-btn');
+                if (undoBtn) handleUndo(undoBtn);
+
+                const generateBtn = e.target.closest('.generate-descriptions-btn');
+                if (generateBtn) await handleGenerateDescriptions(generateBtn);
+
+                const refineBtn = e.target.closest('.refine-btn');
+                if (refineBtn) await handleRefineText(refineBtn);
+                
+                if(e.target.closest('#ai-full-rubric-btn')) await handleFullAISuggest(e.target.closest('#ai-full-rubric-btn'));
+                if(e.target.closest('#ai-suggest-titles-btn')) await handleSuggestCriteriaTitles(e.target.closest('#ai-suggest-titles-btn'));
+                if(e.target.closest('#create-selected-criteria-btn')) handleCreateSelectedCriteria(e.target.closest('#create-selected-criteria-btn'));
+
+                const processFileBtn = e.target.closest('#process-file-btn');
+                if(processFileBtn) await handleFileProcess(processFileBtn);
+                
+                const downloadBtn = e.target.closest('#download-csv-btn');
+                if(downloadBtn) handleDownload();
+
+                if(e.target.closest('#analyze-rubric-btn')) await handleAnalyzeRubric();
+                if(e.target.closest('#student-version-btn')) await handleStudentVersion();
+            });
+            
+            /** Event listener para cambios en inputs (ej. subida de archivo) */
+            appContainer.addEventListener('change', (e) => {
+                const fileInput = e.target.closest('#rubric-file-input');
+                if (fileInput) {
+                    const fileNameSpan = document.getElementById('file-name');
+                    const processBtn = document.getElementById('process-file-btn');
+                    const fileLabel = document.getElementById('file-upload-label');
+                    if (fileInput.files.length > 0) {
+                        fileNameSpan.textContent = fileInput.files[0].name;
+                        processBtn.disabled = false;
+                        fileLabel.style.borderColor = '#4f46e5';
+                    } else {
+                        fileNameSpan.textContent = 'PDF, PNG, JPG';
+                        processBtn.disabled = true;
+                        fileLabel.style.borderColor = '#cbd5e1';
+                    }
+                }
+            });
+
+            // --- LÓGICA DE LA IA Y ACCIONES ---
+
+            /**
+             * Deshace una acción de la IA.
+             * @param {HTMLElement} undoBtn - El botón de deshacer que fue presionado.
+             */
+            function handleUndo(undoBtn) {
+                const undoKey = undoBtn.dataset.undoKey;
+                const state = undoStates[undoKey];
+                if (!state) return;
+
+                const { type, criterionId, levelIndex, value } = state;
+                if (type === 'all-descriptions') {
+                    const textareas = document.querySelectorAll(`#${criterionId} textarea[data-type="level-desc"]`);
+                    textareas.forEach((textarea, index) => textarea.value = value[index] || '');
+                } else if (type === 'single-description') {
+                    const textarea = document.querySelector(`#${criterionId} textarea[data-level-index="${levelIndex}"]`);
+                    if(textarea) textarea.value = value || '';
+                }
+                delete undoStates[undoKey];
+                undoBtn.remove();
+            }
+            
+            /**
+             * Genera todas las descripciones de nivel para un criterio.
+             * @param {HTMLElement} generateBtn - El botón que disparó la acción.
+             */
+            async function handleGenerateDescriptions(generateBtn) {
+                const criterionId = generateBtn.dataset.criterionId;
+                const criterionElement = document.getElementById(criterionId);
+                const criterionTitle = criterionElement.querySelector(`#${criterionId}-title`).value;
+
+                if (!criterionTitle) return alert('Escribe un título para el criterio.');
+                
+                setLoading(generateBtn, true, `<div class="loader"></div>`);
+                
+                const textareas = criterionElement.querySelectorAll('textarea[data-type="level-desc"]');
+                const originalValues = Array.from(textareas).map(t => t.value);
+                const undoKey = `undo-${criterionId}-${Date.now()}`;
+                undoStates[undoKey] = { type: 'all-descriptions', criterionId, value: originalValues };
+
+                try {
+                    const levelTitles = Array.from(criterionElement.querySelectorAll('input[data-type="level-title"]')).map(el => el.value);
+                    const prompt = `Para un criterio de rúbrica titulado "${criterionTitle}", genera ${levelTitles.length} descripciones de nivel de desempeño correspondientes a: "${levelTitles.join('", "')}".`;
+                    const payload = {
+                        contents: [{ role: "user", parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: { type: "OBJECT", properties: { descriptions: { type: "ARRAY", items: { type: "STRING" } } }, required: ["descriptions"] }
+                        }
+                    };
+                    const result = await callGeminiApi(payload);
+
+                    if (result.descriptions && result.descriptions.length === levelTitles.length) {
+                        textareas.forEach((textarea, index) => textarea.value = result.descriptions[index]);
+                        const undoContainer = document.getElementById(`undo-container-${criterionId}-all`);
+                        undoContainer.innerHTML = `<button class="btn btn-undo undo-action-btn" data-undo-key="${undoKey}">Deshacer</button>`;
+                    } else { throw new Error('La respuesta de la IA no contenía el número correcto de descripciones.'); }
+                } catch (error) {
+                    handleError(error, 'generar descripciones');
+                } finally {
+                    setLoading(generateBtn, false, '✨ Generar Descripciones');
+                }
+            }
+
+            /**
+             * Refina el texto de una descripción de nivel específica.
+             * @param {HTMLElement} refineBtn - El botón que disparó la acción.
+             */
+            async function handleRefineText(refineBtn) {
+                const criterionId = refineBtn.dataset.criterionId;
+                const levelIndex = refineBtn.dataset.levelIndex;
+                const textarea = document.querySelector(`#${criterionId} textarea[data-level-index="${levelIndex}"]`);
+                if (!textarea.value) return alert('Escribe algo para poder refinarlo.');
+                
+                setLoading(refineBtn, true, `<div class="loader"></div>`);
+                
+                const undoKey = `undo-${criterionId}-${levelIndex}-${Date.now()}`;
+                undoStates[undoKey] = { type: 'single-description', criterionId, levelIndex, value: textarea.value };
+
+                try {
+                    const prompt = `Refina y mejora el siguiente texto para una descripción de nivel en una rúbrica: "${textarea.value}"`;
+                    const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                    const result = await callGeminiApi(payload);
+                    
+                    if (result.candidates?.[0]?.content.parts[0].text) {
+                        textarea.value = result.candidates[0].content.parts[0].text;
+                        const undoContainer = document.getElementById(`undo-container-${criterionId}-${levelIndex}`);
+                        undoContainer.innerHTML = `<button class="btn btn-undo undo-action-btn" data-undo-key="${undoKey}">Deshacer</button>`;
+                    } else { throw new Error('La respuesta de la IA no tiene el formato esperado.'); }
+                } catch (error) {
+                    handleError(error, 'refinar texto');
+                } finally {
+                    setLoading(refineBtn, false, `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c-1.1 0-2 .9-2 2v2.5a2.5 2.5 0 1 0 5 0V5c0-1.1-.9-2-2-2Z"/><path d="M5 10v2a7 7 0 0 0 14 0v-2"/><path d="M12 19v2"/><path d="M8 23h8"/></svg>`);
+                }
+            }
+            
+            /**
+             * Genera una rúbrica completa basada en la entrada del usuario.
+             * @param {HTMLElement} aiSuggestBtn - El botón que disparó la acción.
+             */
+            async function handleFullAISuggest(aiSuggestBtn) {
+                const subject = document.getElementById('subject').value.trim();
+                const level = document.getElementById('level').value.trim();
+                const skill = document.getElementById('skill').value.trim();
+                if (!skill) return alert('Introduce un Título General.');
+
+                setLoading(loadingSpinner, true);
+                setLoading(aiSuggestBtn, true);
+
+                try {
+                    const prompt = `Genera una rúbrica para "${skill}" (Asignatura: ${subject || 'general'}, Nivel: ${level || 'general'}). Debe tener entre 3 y 5 criterios. Para cada criterio, proporciona: title, un array de 4 points (como strings), un array de 4 levelTitles, y un array de 4 levelDescs.`;
+                     const result = await callGeminiApi({
+                        contents: [{ role: "user", parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            responseMimeType: "application/json",
+                            responseSchema: {
+                                type: "OBJECT", properties: {
+                                    rubric_criteria: { type: "ARRAY", items: {
+                                        type: "OBJECT", properties: {
+                                            title: { type: "STRING" },
+                                            points: { type: "ARRAY", items: { type: "STRING" } },
+                                            levelTitles: { type: "ARRAY", items: { type: "STRING" } },
+                                            levelDescs: { type: "ARRAY", items: { type: "STRING" } }
+                                        }, required: ["title", "points", "levelTitles", "levelDescs"]
+                                    }}
+                                }, required: ["rubric_criteria"]
+                            }
+                        }
+                    });
+                    
+                    if (result.rubric_criteria?.length > 0) {
+                        criteriaContainer.innerHTML = '';
+                        criterionCounter = 0;
+                        currentLevelCount = result.rubric_criteria[0].levelTitles.length || 4;
+                        result.rubric_criteria.forEach(createCriterionElement);
+                        aiSuggestBtn.closest('.card').classList.add('hidden-section');
+                    } else { throw new Error("La IA no devolvió criterios válidos."); }
+                } catch (error) {
+                    handleError(error, 'generar la rúbrica completa');
+                } finally {
+                    setLoading(loadingSpinner, false);
+                    setLoading(aiSuggestBtn, false);
+                }
+            }
+
+            /**
+             * Procesa un archivo de rúbrica subido por el usuario.
+             * @param {HTMLElement} processFileBtn - El botón que disparó la acción.
+             */
+            async function handleFileProcess(processFileBtn) {
+                 const fileInput = document.getElementById('rubric-file-input');
+                 if (fileInput.files.length === 0) return alert('Selecciona un archivo.');
+                 const file = fileInput.files[0];
+                 
+                 setLoading(loadingSpinner, true);
+                 setLoading(processFileBtn, true, '<div class="loader"></div><span class="ml-2">Procesando...</span>');
+
+                 try {
+                     const base64Data = await fileToBase64(file);
+                     const prompt = `Analiza este documento de rúbrica. Extrae el título general y todos sus criterios. Para cada criterio, extrae: title, un array de points (como strings), un array de levelTitles, y un array de levelDescs. Devuelve un JSON.`;
+                     const result = await callGeminiApi({
+                         contents: [{ parts: [ { text: prompt }, { inlineData: { mimeType: file.type, data: base64Data } } ] }],
+                         generationConfig: { responseMimeType: "application/json", responseSchema: {
+                             type: "OBJECT", properties: {
+                                 rubric_title: { type: "STRING" },
+                                 rubric_criteria: { type: "ARRAY", items: {
+                                     type: "OBJECT", properties: {
+                                         title: { type: "STRING" },
+                                         points: { type: "ARRAY", items: { type: "STRING" } },
+                                         levelTitles: { type: "ARRAY", items: { type: "STRING" } },
+                                         levelDescs: { type: "ARRAY", items: { type: "STRING" } }
+                                     }, required: ["title", "points", "levelTitles", "levelDescs"]
+                                 }}
+                             }, required: ["rubric_title", "rubric_criteria"]
+                         }}
+                     });
+
+                     if (result.rubric_title && result.rubric_criteria?.length > 0) {
+                         if (!document.getElementById('skill')) {
+                             const titleInputHTML = `<div class="card"><label for="skill" class="block text-sm font-medium">Título General</label><input type="text" id="skill" class="w-full p-2 border rounded-md mt-1"></div>`;
+                             editorContent.insertAdjacentHTML('afterbegin', titleInputHTML);
+                         }
+                         document.getElementById('skill').value = result.rubric_title;
+                         
+                         criteriaContainer.innerHTML = '';
+                         criterionCounter = 0;
+                         currentLevelCount = result.rubric_criteria[0].levelTitles.length || 4;
+                         result.rubric_criteria.forEach(createCriterionElement);
+                         processFileBtn.parentElement.classList.add('hidden-section');
+                     } else { throw new Error("La IA no pudo extraer los datos de la rúbrica del archivo."); }
+                 } catch (error) {
+                     handleError(error, 'procesar el archivo');
+                 } finally {
+                     setLoading(loadingSpinner, false);
+                     setLoading(processFileBtn, false, '✨ Analizar y Replicar Rúbrica');
+                 }
+            }
+            
+            // --- NUEVAS FUNCIONES CON IA ---
+
+            async function handleSuggestCriteriaTitles(btn) {
+                const skill = document.getElementById('skill').value.trim();
+                if (!skill) return alert('Introduce un Título General para sugerir criterios.');
+                
+                const suggestionArea = document.getElementById('ai-suggestion-area');
+                suggestionArea.innerHTML = `<div class="flex items-center justify-center"><div class="loader"></div><p class="ml-2">Sugiriendo criterios...</p></div>`;
+                setLoading(btn, true);
+                
+                try {
+                    const prompt = `Para una rúbrica sobre "${skill}", sugiere entre 5 y 7 títulos de criterios de evaluación concisos y relevantes.`;
+                    const result = await callGeminiApi({
+                        contents: [{ role: "user", parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json", responseSchema: {
+                            type: "OBJECT", properties: { titles: { type: "ARRAY", items: { type: "STRING" } } }, required: ["titles"]
+                        }}
+                    });
+
+                    if (result.titles?.length > 0) {
+                        suggestionArea.innerHTML = `
+                            <h3 class="font-semibold mb-2">Criterios Sugeridos (selecciona los que quieras):</h3>
+                            <div class="space-y-2 max-h-48 overflow-y-auto border p-3 rounded-md">
+                                ${result.titles.map((title, i) => `
+                                    <label class="flex items-center">
+                                        <input type="checkbox" class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" value="${escapeCsvField(title)}" checked>
+                                        <span class="ml-3 text-sm">${escapeCsvField(title)}</span>
+                                    </label>
+                                `).join('')}
+                            </div>
+                            <button id="create-selected-criteria-btn" class="btn btn-secondary w-full mt-3">Crear Criterios Seleccionados</button>
+                        `;
+                    } else {
+                        suggestionArea.textContent = "No se pudieron generar sugerencias.";
+                    }
+                } catch (error) {
+                    handleError(error, 'sugerir títulos de criterios');
+                    suggestionArea.textContent = "Error al generar sugerencias.";
+                } finally {
+                    setLoading(btn, false, '✨ Sugerir Criterios');
+                }
+            }
+
+            function handleCreateSelectedCriteria(btn) {
+                const checkboxes = document.querySelectorAll('#ai-suggestion-area input[type="checkbox"]:checked');
+                if (checkboxes.length === 0) return alert("Selecciona al menos un criterio.");
+                
+                criteriaContainer.innerHTML = '';
+                criterionCounter = 0;
+                checkboxes.forEach(cb => createCriterionElement({ title: cb.value }));
+
+                btn.closest('.card').classList.add('hidden-section');
+            }
+            
+            /** Recopila todos los datos de la rúbrica actual en un objeto. */
+            function getRubricData() {
+                const criteriaItems = criteriaContainer.querySelectorAll('.criterion-item');
+                if (criteriaItems.length === 0) return null;
+
+                const rubricTitle = document.getElementById('skill')?.value || 'Sin Título';
+                const criteria = Array.from(criteriaItems).map((item, index) => {
+                    const criterionTitle = item.querySelector(`#criterion-${index + 1}-title`).value;
+                    const points = Array.from(item.querySelectorAll('input[data-type="point"]')).map(el => el.value);
+                    const levelTitles = Array.from(item.querySelectorAll('input[data-type="level-title"]')).map(el => el.value);
+                    const levelDescs = Array.from(item.querySelectorAll('textarea[data-type="level-desc"]')).map(el => el.value);
+                    return { criterionTitle, points, levelTitles, levelDescs };
+                });
+                return { rubricTitle, criteria };
+            }
+
+            async function handleAnalyzeRubric() {
+                const rubricData = getRubricData();
+                if (!rubricData) return alert("No hay una rúbrica para analizar. Añade al menos un criterio.");
+
+                showModal('Analizando Rúbrica...', '<div class="flex items-center justify-center p-8"><div class="loader"></div></div>');
+
+                try {
+                    const prompt = `Como experto pedagogo, analiza la siguiente rúbrica en formato JSON. Proporciona retroalimentación constructiva sobre:
+                    1.  **Coherencia y Relevancia:** ¿Los criterios se alinean bien con el título general de la rúbrica ("${rubricData.rubricTitle}")?
+                    2.  **Claridad y Precisión:** ¿Los títulos y descripciones son claros, específicos y fáciles de entender?
+                    3.  **Progresión Lógica:** ¿Hay una distinción clara y una progresión lógica en las descripciones entre los diferentes niveles de desempeño?
+                    4.  **Sugerencias de Mejora:** Ofrece sugerencias concretas para mejorar la rúbrica.
+                    Formatea tu respuesta en HTML simple.
+                    
+                    Datos de la Rúbrica:
+                    ${JSON.stringify(rubricData, null, 2)}`;
+                    
+                    const result = await callGeminiApi({ contents: [{ parts: [{ text: prompt }] }] });
+                    const analysisText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if(analysisText) {
+                         showModal('Análisis de Coherencia de la Rúbrica', analysisText);
+                    } else { throw new Error('No se recibió análisis.'); }
+                } catch(error) {
+                    handleError(error, 'analizar la rúbrica');
+                    hideModal();
+                }
+            }
+
+            async function handleStudentVersion() {
+                const rubricData = getRubricData();
+                if (!rubricData) return alert("No hay una rúbrica para crear una versión para alumnos.");
+
+                showModal('Creando Versión para Alumnos...', '<div class="flex items-center justify-center p-8"><div class="loader"></div></div>');
+                
+                try {
+                    const prompt = `Convierte la siguiente rúbrica (en JSON) a un formato amigable para estudiantes. Usa un lenguaje claro, positivo y directo. Para cada criterio y nivel de desempeño, crea una frase que comience con "Puedo..." o similar.
+                    Formatea la respuesta en HTML simple, usando títulos (<h3>) para cada criterio y una lista (<ul><li>) para los niveles.
+                    
+                    Datos de la Rúbrica:
+                    ${JSON.stringify(rubricData, null, 2)}`;
+
+                    const result = await callGeminiApi({ contents: [{ parts: [{ text: prompt }] }] });
+                    const studentText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if(studentText) {
+                         showModal('Rúbrica para Alumnos ("Yo Puedo...")', studentText);
+                    } else { throw new Error('No se recibió la versión para alumnos.'); }
+                } catch(error) {
+                    handleError(error, 'crear la versión para alumnos');
+                    hideModal();
+                }
+            }
+
+            /**
+             * Recopila los datos de la rúbrica y los descarga como un archivo CSV.
+             */
+            function handleDownload() {
+                const criteriaItems = criteriaContainer.querySelectorAll('.criterion-item');
+                if (criteriaItems.length === 0) return alert("No hay criterios para descargar.");
+
+                let csvContent = "";
+                criteriaItems.forEach((item, index) => {
+                    const criterionTitle = item.querySelector(`#criterion-${index + 1}-title`).value;
+                    const points = Array.from(item.querySelectorAll('input[data-type="point"]')).map(el => el.value);
+                    const levelTitles = Array.from(item.querySelectorAll('input[data-type="level-title"]')).map(el => el.value);
+                    const levelDescs = Array.from(item.querySelectorAll('textarea[data-type="level-desc"]')).map(el => el.value);
+                    
+                    if (index === 0) {
+                        const header = ["Título del Criterio", ...levelTitles.map((t,i) => `Título del Nivel ${i+1}`), ...levelTitles.map((t,i) => `Descripción del Nivel ${i+1}`), ...levelTitles.map((t,i) => `Puntos del Nivel ${i+1}`)];
+                        // Esto es solo un ejemplo de cabecera, el formato de classroom es diferente
+                    }
+                    
+                    // Formato para Google Classroom
+                    csvContent += `"${criterionTitle}",` + levelDescs.map((d, i) => `"${levelTitles[i]}","${d.replace(/"/g, '""')}","${points[i]}"`).join(',') + '\r\n';
+
+                });
+                
+                // Formato de Google Classroom requiere que la primera línea tenga el título de la rúbrica
+                 const skillTitle = document.getElementById('skill')?.value.trim() || 'rubrica';
+                 csvContent = `"${skillTitle}",,,,,,,,,,\r\n` + csvContent;
+
+
+                // Crear el blob y el enlace de descarga
+                const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `${skillTitle.replace(/ /g, '_')}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            // --- LLAMADA A LA API DE GEMINI ---
+
+            /**
+             * Llama a la API de Gemini con reintentos y backoff exponencial.
+             * @param {object} payload - El cuerpo de la solicitud para la API.
+             * @returns {Promise<object>} La respuesta JSON de la API.
+             */
+            async function callGeminiApi(payload) {
+                const apiKey = ""; // Dejar en blanco, se gestiona en el entorno de ejecución
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                let response;
+                let attempts = 0;
+                const maxAttempts = 5;
+                let delay = 1000;
+
+                while (attempts < maxAttempts) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.ok) {
+                            const result = await response.json();
+                            if (payload.generationConfig?.responseMimeType === "application/json") {
+                                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                                if (!jsonText) throw new Error("La respuesta de la API no contiene el JSON esperado.");
+                                return JSON.parse(jsonText);
+                            }
+                            return result;
+                        } else if (response.status === 429 || response.status >= 500) {
+                            attempts++;
+                            if (attempts >= maxAttempts) throw new Error(`Error de API (${response.status}). Se alcanzó el máximo de reintentos.`);
+                            await new Promise(resolve => setTimeout(resolve, delay));
+                            delay *= 2;
+                        } else {
+                            const errorBody = await response.text();
+                            throw new Error(`Error de API (${response.status}): ${errorBody}`);
+                        }
+                    } catch (error) {
+                        attempts++;
+                        if (attempts >= maxAttempts) throw error;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2;
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
